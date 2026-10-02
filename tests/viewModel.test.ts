@@ -51,4 +51,35 @@ describe('ExpoSketchViewModel', () => {
     vm.resizeSelected(0, 0);
     expect(vm.state.document.elements[0].width).toBe(before);
   });
+
+  it('applies only the example content while keeping the custom field size intact', () => {
+    const vm = new ExpoSketchViewModel(fakeRepository());
+    vm.resizeField(12, 10);
+    expect(vm.state.document.field).toEqual({ width: 12, height: 10 });
+
+    vm.applyExampleContent();
+
+    expect(vm.state.document.field).toEqual({ width: 12, height: 10 });
+    expect(vm.state.document.elements).toHaveLength(createStarterDocument().elements.length);
+    expect(vm.state.analysis.bounds).toEqual([]);
+    expect(vm.state.notice.message).toContain('12 × 10');
+  });
+
+  it('keeps example elements untouched when they already fit the current field', () => {
+    const vm = new ExpoSketchViewModel(fakeRepository());
+    vm.resizeField(40, 20);
+    const example = createStarterDocument().elements;
+    vm.applyExampleContent();
+    expect(vm.state.document.field).toEqual({ width: 40, height: 20 });
+    expect(vm.state.document.elements).toEqual(example);
+    expect(vm.state.analysis.bounds).toEqual([]);
+  });
+
+  it('restores the whole example document including the starter field size', () => {
+    const vm = new ExpoSketchViewModel(fakeRepository());
+    vm.resizeField(12, 10);
+    vm.restoreExampleDocument();
+    expect(vm.state.document).toEqual(createStarterDocument());
+    expect(vm.state.document.field).toEqual({ width: 28, height: 18 });
+  });
 });

@@ -1,4 +1,4 @@
-import { createElement, createStarterDocument, analyzeLayout, findElement, getBoundingBox, normalizeRotation } from './domain';
+import { createElement, createStarterDocument, analyzeLayout, findElement, fitExampleElements, getBoundingBox, normalizeRotation } from './domain';
 import type { LayoutRepository } from './repository';
 import type { Analysis, ElementKind, LayoutDocument, LayoutMode, Notice, RenderElement, ViewPhase } from './types';
 
@@ -109,9 +109,22 @@ export class ExpoSketchViewModel {
     this.commitAndPersist({ document: { ...this.stateValue.document, title: title.trim() } });
   }
 
-  resetExample() {
+  /** 只套用示例里的摆法：保留当前场地尺寸与项目名称，替换全部元素。放不下时等比缩小，保证不越界。 */
+  applyExampleContent() {
+    const current = this.stateValue.document;
+    const fitted = fitExampleElements(current.field);
+    const document = { ...current, elements: fitted.elements };
+    const preferredId = fitted.elements.find((element) => element.kind === 'stage')?.id ?? fitted.elements[0]?.id ?? null;
+    const notice = fitted.resized
+      ? { tone: 'warning' as const, message: `示例摆法已按 ${Math.round(fitted.scale * 100)}% 等比缩放到当前场地 ${current.field.width} × ${current.field.height} m，场地尺寸未改动` }
+      : { tone: 'success' as const, message: `示例摆法已套用，场地尺寸保持 ${current.field.width} × ${current.field.height} m 不变` };
+    this.commitAndPersist({ document, selectedId: preferredId, mode: 'edit', notice });
+  }
+
+  /** 整份文档回到示例：项目名称、场地尺寸、元素全部恢复为示例值，属于破坏性操作，需调用方二次确认。 */
+  restoreExampleDocument() {
     const document = createStarterDocument();
-    this.commitAndPersist({ document, selectedId: 'stage-1', mode: 'edit', notice: { tone: 'success', message: '已恢复示例布局' } });
+    this.commitAndPersist({ document, selectedId: 'stage-1', mode: 'edit', notice: { tone: 'success', message: `整份文档已恢复为示例（场地尺寸恢复为 ${document.field.width} × ${document.field.height} m）` } });
   }
 
   private commitAndPersist(patch: Partial<ExpoSketchState>) {

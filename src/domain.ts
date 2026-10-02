@@ -20,10 +20,12 @@ export const ELEMENT_SPECS: Record<ElementKind, ElementSpec> = {
   entrance: { kind: 'entrance', label: '入口', eyebrow: 'ENTRY', icon: '↗', color: '#fff2d8', width: 2.5, height: 1.5 },
 };
 
+export const STARTER_FIELD: FieldSize = { width: 28, height: 18 };
+
 export const createStarterDocument = (): LayoutDocument => ({
   version: 1,
   title: '春日创意市集 · A 区',
-  field: { width: 28, height: 18 },
+  field: STARTER_FIELD,
   elements: [
     { id: 'entry-1', kind: 'entrance', name: '主入口', x: 1, y: 8.25, width: 2.5, height: 1.5, rotation: 0 },
     { id: 'stage-1', kind: 'stage', name: '分享舞台', x: 10, y: 1.5, width: 8, height: 4, rotation: 0 },
@@ -55,6 +57,63 @@ export const getBoundingBox = (element: ExpoElement) => {
   const width = isQuarterTurn ? element.height : element.width;
   const height = isQuarterTurn ? element.width : element.height;
   return { left: element.x, top: element.y, right: element.x + width, bottom: element.y + height, width, height };
+};
+
+const round1 = (value: number) => Number(value.toFixed(1));
+
+const clampInsideField = (element: ExpoElement, field: FieldSize): ExpoElement => {
+  const box = getBoundingBox(element);
+  const x = round1(Math.min(Math.max(0, element.x), field.width - box.width));
+  const y = round1(Math.min(Math.max(0, element.y), field.height - box.height));
+  return { ...element, x, y };
+};
+
+export interface FittedExample {
+  elements: ExpoElement[];
+  scale: number;
+  resized: boolean;
+}
+
+/**
+ * 把示例摆法放进给定场地：
+ * - 场地尺寸保持不变，只调整元素；
+ * - 示例内容放得下时原样返回（不平移、不放大）；
+ * - 放不下时以同一比例等比缩小并保留元素间的相对摆法，四周保留边距；
+ * - 最后逐个向内取整钳制，保证没有元素处于越界状态。
+ */
+export const fitExampleElements = (field: FieldSize, example: ExpoElement[] = createStarterDocument().elements): FittedExample => {
+  if (example.length === 0) return { elements: [], scale: 1, resized: false };
+  const boxes = example.map(getBoundingBox);
+  const minLeft = Math.min(...boxes.map((box) => box.left));
+  const minTop = Math.min(...boxes.map((box) => box.top));
+  const contentWidth = Math.max(...boxes.map((box) => box.right)) - minLeft;
+  const contentHeight = Math.max(...boxes.map((box) => box.bottom)) - minTop;
+
+  const margin = 0.5;
+  const availableWidth = Math.max(0.1, field.width - margin * 2);
+  const availableHeight = Math.max(0.1, field.height - margin * 2);
+  const scale = Math.min(1, availableWidth / contentWidth, availableHeight / contentHeight);
+
+  if (scale === 1) return { elements: example, scale: 1, resized: false };
+
+  const scaledWidth = contentWidth * scale;
+  const scaledHeight = contentHeight * scale;
+  const targetLeft = (field.width - scaledWidth) / 2;
+  const targetTop = (field.height - scaledHeight) / 2;
+
+  const elements = example.map((element) => {
+    const next: ExpoElement = {
+      ...element,
+      x: round1(targetLeft + (element.x - minLeft) * scale),
+      y: round1(targetTop + (element.y - minTop) * scale),
+      width: round1(element.width * scale),
+      height: round1(element.height * scale),
+      rotation: element.rotation,
+    };
+    return clampInsideField(next, field);
+  });
+
+  return { elements, scale: Number(scale.toFixed(2)), resized: true };
 };
 
 const intersectionSize = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
