@@ -4,6 +4,7 @@ import type {
   ChannelIssue,
   ElementKind,
   ElementSpec,
+  ExampleContentPlan,
   ExpoElement,
   FieldSize,
   LayoutDocument,
@@ -12,6 +13,8 @@ import type {
 } from './types';
 
 export const MIN_CHANNEL = 1.2;
+
+export const EXAMPLE_FIELD: FieldSize = { width: 28, height: 18 };
 
 export const ELEMENT_SPECS: Record<ElementKind, ElementSpec> = {
   booth: { kind: 'booth', label: '标准展位', eyebrow: 'BOOTH', icon: '▦', color: '#e7f0ff', width: 5, height: 3.5 },
@@ -23,7 +26,7 @@ export const ELEMENT_SPECS: Record<ElementKind, ElementSpec> = {
 export const createStarterDocument = (): LayoutDocument => ({
   version: 1,
   title: '春日创意市集 · A 区',
-  field: { width: 28, height: 18 },
+  field: { ...EXAMPLE_FIELD },
   elements: [
     { id: 'entry-1', kind: 'entrance', name: '主入口', x: 1, y: 8.25, width: 2.5, height: 1.5, rotation: 0 },
     { id: 'stage-1', kind: 'stage', name: '分享舞台', x: 10, y: 1.5, width: 8, height: 4, rotation: 0 },
@@ -32,6 +35,36 @@ export const createStarterDocument = (): LayoutDocument => ({
     { id: 'seating-1', kind: 'seating', name: '休息座席', x: 10, y: 11, width: 6, height: 3, rotation: 0 },
   ],
 });
+
+const round1 = (value: number) => Number(value.toFixed(1));
+
+/**
+ * 把示例摆法适配到指定场地：
+ * - 尺寸超出场地的示例元素直接跳过，而不是放进界外；
+ * - 其余元素夹取到场地边界内，坐标被改动过的记入 adjusted，便于明确告知用户。
+ */
+export const planExampleContent = (field: FieldSize): ExampleContentPlan => {
+  const elements: ExpoElement[] = [];
+  const adjusted: ExpoElement[] = [];
+  const skipped: ExampleContentPlan['skipped'] = [];
+  createStarterDocument().elements.forEach((element) => {
+    if (element.width > field.width || element.height > field.height) {
+      skipped.push({ name: element.name, width: element.width, height: element.height });
+      return;
+    }
+    const needsMove = element.x < 0 || element.y < 0 || element.x + element.width > field.width || element.y + element.height > field.height;
+    if (!needsMove) {
+      elements.push({ ...element });
+      return;
+    }
+    const x = round1(Math.max(0, Math.min(field.width - element.width, element.x)));
+    const y = round1(Math.max(0, Math.min(field.height - element.height, element.y)));
+    const placed = { ...element, x, y };
+    elements.push(placed);
+    adjusted.push(placed);
+  });
+  return { field: { ...field }, elements, adjusted, skipped };
+};
 
 export const createElement = (kind: ElementKind, index: number, field: FieldSize): ExpoElement => {
   const spec = ELEMENT_SPECS[kind];

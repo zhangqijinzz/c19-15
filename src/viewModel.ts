@@ -1,4 +1,4 @@
-import { createElement, createStarterDocument, analyzeLayout, findElement, getBoundingBox, normalizeRotation } from './domain';
+import { createElement, createStarterDocument, analyzeLayout, findElement, formatArea, getBoundingBox, normalizeRotation, planExampleContent } from './domain';
 import type { LayoutRepository } from './repository';
 import type { Analysis, ElementKind, LayoutDocument, LayoutMode, Notice, RenderElement, ViewPhase } from './types';
 
@@ -109,9 +109,23 @@ export class ExpoSketchViewModel {
     this.commitAndPersist({ document: { ...this.stateValue.document, title: title.trim() } });
   }
 
-  resetExample() {
+  /** 只取示例摆法：保留当前场地尺寸与项目名，示例元素经边界适配后替换现有元素。 */
+  importExampleElements() {
+    const current = this.stateValue.document;
+    const plan = planExampleContent(current.field);
+    const document: LayoutDocument = { ...current, elements: plan.elements };
+    const message = plan.skipped.length
+      ? `示例元素已载入并适配当前场地，${plan.adjusted.length} 个位置已挪动，${plan.skipped.length} 个因超出场地未导入`
+      : plan.adjusted.length
+        ? `示例摆法已载入当前 ${formatArea(current.field)} 场地，${plan.adjusted.length} 个元素位置已挪动到界内`
+        : `示例摆法已载入当前 ${formatArea(current.field)} 场地`;
+    this.commitAndPersist({ document, selectedId: plan.elements[0]?.id ?? null, mode: 'edit', notice: { tone: plan.adjusted.length || plan.skipped.length ? 'warning' : 'success', message } });
+  }
+
+  /** 整份文档回到示例：场地尺寸、项目名、元素全部恢复（调用方需先取得用户确认）。 */
+  loadExampleDocument() {
     const document = createStarterDocument();
-    this.commitAndPersist({ document, selectedId: 'stage-1', mode: 'edit', notice: { tone: 'success', message: '已恢复示例布局' } });
+    this.commitAndPersist({ document, selectedId: document.elements[0]?.id ?? null, mode: 'edit', notice: { tone: 'success', message: '整份文档已恢复为示例布局' } });
   }
 
   private commitAndPersist(patch: Partial<ExpoSketchState>) {

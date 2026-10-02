@@ -72,6 +72,19 @@ export interface Analysis {
   path: PathPreview | null;
 }
 
+export interface ExampleSkippedElement {
+  name: string;
+  width: number;
+  height: number;
+}
+
+export interface ExampleContentPlan {
+  field: FieldSize;
+  elements: ExpoElement[];
+  adjusted: ExpoElement[];
+  skipped: ExampleSkippedElement[];
+}
+
 export interface Notice {
   tone: 'info' | 'success' | 'warning' | 'error';
   message: string;
